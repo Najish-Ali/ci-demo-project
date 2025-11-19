@@ -54,16 +54,6 @@ pipeline {
                 """
             }
         }
-
-        stage('Send Notification to SQS') {
-            steps {
-                sh """
-                aws sqs send-message \
-                --queue-url ${SQS_QUEUE_URL} \
-                --message-body "Deployment Successful! Node site & artifacts uploaded."
-                """
-            }
-        }
     }
 
     post {

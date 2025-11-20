@@ -73,9 +73,12 @@ pipeline {
             }
         }
 
-        stage('Restart Tomcat') {
+        stage('Reload Tomcat App') {
             steps {
-                sh 'brew services restart tomcat'
+                sh """
+                curl -u admin:admin "http://localhost:8080/manager/text/reload?path=/maven-app"
+                curl -u admin:admin "http://localhost:8080/manager/text/reload?path=/gradle-app"
+                """
             }
         }
     }

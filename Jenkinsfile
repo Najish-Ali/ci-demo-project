@@ -37,7 +37,7 @@ pipeline {
         stage('Build Gradle App') {
             steps {
                 dir('gradle-app') {
-                    sh './gradlew clean build'
+                    sh 'gradle clean build'
                 }
             }
         }

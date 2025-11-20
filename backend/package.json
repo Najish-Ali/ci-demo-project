@@ -1,0 +1,13 @@
+{
+  "name": "ci-demo-backend",
+  "version": "1.0.0",
+  "description": "Backend Node.js app for ASG/ALB",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "stress": "node stress.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

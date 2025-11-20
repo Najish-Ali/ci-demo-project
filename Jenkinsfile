@@ -3,73 +3,87 @@ pipeline {
 
     environment {
         AWS_DEFAULT_REGION = "us-east-1"
-        S3_BUCKET = "ci-demo-static-site-12345"
-        SQS_QUEUE_URL = "https://sqs.us-east-1.amazonaws.com/711379610854/deployment-events"
-        SNS_TOPIC_ARN = "arn:aws:sns:us-east-1:711379610854:deployNotifications"
+        S3_BUCKET = "ci-demo-build "
+        BACKEND_PRIVATE_KEY = credentials('ec2-ssh-key')
+        BACKEND_SERVER_USER = "ubuntu"
+        BACKEND_SERVER_IP = "10.0.2.46"
     }
 
     stages {
-        stage('Clone Repo') {
+
+        stage('Checkout') {
             steps {
                 git branch: 'main', url: 'https://github.com/Najish-Ali/ci-demo-project.git'
             }
         }
 
-        stage('Build Node App') {
+        stage('Build Frontend') {
             steps {
-                dir('node-app') {
-                    sh 'npm install'
-                    sh 'node build.js'
-                }
+                dir('frontend') { sh 'npm install' }
             }
         }
 
-        stage('Build Maven App') {
+        stage('Build Backend') {
             steps {
-                dir('maven-app') {
-                    sh 'mvn clean package'
-                }
+                dir('backend') { sh 'npm install' }
             }
         }
 
-        stage('Build Gradle App') {
+        stage('Build Maven') {
             steps {
-                dir('gradle-app') {
-                    sh 'gradle build'
-                }
+                dir('maven-app') { sh 'mvn clean package' }
             }
         }
 
-        stage('Upload Node Site to S3') {
+        stage('Build Gradle') {
             steps {
-                sh 'aws s3 sync node-app/dist/ s3://${S3_BUCKET}/ --delete'
+                dir('gradle-app') { sh './gradlew build' }
             }
         }
 
         stage('Upload Artifacts to S3') {
             steps {
                 sh """
-                aws s3 cp maven-app/target/ s3://${S3_BUCKET}/artifacts/maven/ --recursive
-                aws s3 cp gradle-app/build/libs/ s3://${S3_BUCKET}/artifacts/gradle/ --recursive
+                aws s3 cp maven-app/target/ s3://${S3_BUCKET}/maven/ --recursive
+                aws s3 cp gradle-app/build/ s3://${S3_BUCKET}/gradle/ --recursive
                 """
             }
         }
+
+        stage('Deploy Frontend to Tomcat') {
+            steps {
+                sh """
+                rm -rf /var/lib/tomcat9/webapps/frontend
+                mkdir -p /var/lib/tomcat9/webapps/frontend
+                cp -r frontend/* /var/lib/tomcat9/webapps/frontend/
+                systemctl restart tomcat9
+                """
+            }
+        }
+
+        stage('Deploy Backend to EC2 Using PM2') {
+            steps {
+                sh """
+                ssh -o StrictHostKeyChecking=no -i ${BACKEND_PRIVATE_KEY} ${BACKEND_SERVER_USER}@${BACKEND_SERVER_IP} '
+                    sudo mkdir -p /opt/backend &&
+                    sudo rm -rf /opt/backend/* &&
+                    sudo npm install pm2 -g &&
+                    sudo cp -r ~/workspace/ci-demo-project/backend/* /opt/backend &&
+                    cd /opt/backend &&
+                    pm2 delete backend || true &&
+                    pm2 start server.js --name backend &&
+                    pm2 save
+                '
+                """
+            }
+        }
+
+        stage('Publish SNS Event') {
+            steps {
+                sh 'aws sns publish --topic-arn arn:aws:sns:us-east-1:ACCOUNT:ci-demo-events --message "Jenkins pipeline completed"'
+            }
+        }
+
     }
 
-    post {
-        success {
-            sh """
-            aws sns publish \
-            --topic-arn ${SNS_TOPIC_ARN} \
-            --message "Deployment SUCCESS: Node site & artifacts uploaded. Check S3."
-            """
-        }
-        failure {
-            sh """
-            aws sns publish \
-            --topic-arn ${SNS_TOPIC_ARN} \
-            --message "Deployment FAILED! Check Jenkins logs."
-            """
-        }
-    }
 }

@@ -1,0 +1,15 @@
+<html>
+<body>
+<h1>Frontend (Tomcat)</h1>
+<button onclick="go()">Load Test</button>
+<pre id="out"></pre>
+
+<script>
+function go() {
+    fetch('/api/stress')
+       .then(r=>r.json())
+       .then(j=>document.getElementById('out').innerHTML = JSON.stringify(j,null,2))
+}
+</script>
+</body>
+</html>

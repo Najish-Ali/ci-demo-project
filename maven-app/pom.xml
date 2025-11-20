@@ -6,5 +6,5 @@
   <groupId>com.demo</groupId>
   <artifactId>maven-demo</artifactId>
   <version>1.0</version>
-  <packaging>jar</packaging>
+  <packaging>war</packaging>
 </project>

@@ -1,4 +1,5 @@
 plugins {
+    id 'war'
     id 'java'
 }
 
@@ -18,9 +19,9 @@ dependencies {
     testImplementation 'junit:junit:4.13.2'
 }
 
-jar {
-    manifest {
-        attributes 'Main-Class': 'com.demo.GradleApp'
-    }
+// Configure the WAR task
+war {
+    archiveFileName = 'gradle-app.war'  // Name of the WAR file
+    from 'src/main/webapp'               // Include static HTML files
 }
 

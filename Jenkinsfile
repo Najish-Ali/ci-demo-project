@@ -4,8 +4,10 @@ pipeline {
     environment {
         AWS_DEFAULT_REGION = "us-east-1"
         S3_BUCKET = "ci-demo-static-site-12345"
-        SQS_QUEUE_URL = "https://sqs.us-east-1.amazonaws.com/711379610854/deployment-events"
-        SNS_TOPIC_ARN = "arn:aws:sns:us-east-1:711379610854:deployNotifications"
+        SQS_QUEUE_URL = "https://sqs.us-east-1.amazonaws.com/711379610854/demo-queue"
+        SNS_TOPIC_ARN = "arn:aws:sns:us-east-1:711379610854:demo"
+        TOMCAT_WEBAPPS = "/opt/homebrew/opt/tomcat/libexec/webapps"
+        TOMCAT_BIN = "/opt/homebrew/opt/tomcat/libexec/bin"
     }
 
     stages {
@@ -35,7 +37,7 @@ pipeline {
         stage('Build Gradle App') {
             steps {
                 dir('gradle-app') {
-                    sh 'gradle build'
+                    sh './gradlew clean build'
                 }
             }
         }
@@ -46,12 +48,34 @@ pipeline {
             }
         }
 
-        stage('Upload Artifacts to S3') {
+        // stage('Upload Artifacts to S3') {
+        //     steps {
+        //         sh """
+        //         aws s3 cp maven-app/target/ s3://${S3_BUCKET}/artifacts/maven/ --recursive
+        //         aws s3 cp gradle-app/build/libs/ s3://${S3_BUCKET}/artifacts/gradle/ --recursive
+        //         """
+        //     }
+        // }
+
+        stage('Deploy Maven App to Tomcat') {
             steps {
                 sh """
-                aws s3 cp maven-app/target/ s3://${S3_BUCKET}/artifacts/maven/ --recursive
-                aws s3 cp gradle-app/build/libs/ s3://${S3_BUCKET}/artifacts/gradle/ --recursive
+                cp maven-app/target/*.war ${TOMCAT_WEBAPPS}/maven-app.war
                 """
+            }
+        }
+
+        stage('Deploy Gradle App to Tomcat') {
+            steps {
+                sh """
+                cp gradle-app/build/libs/*.war ${TOMCAT_WEBAPPS}/gradle-app.war
+                """
+            }
+        }
+
+        stage('Restart Tomcat') {
+            steps {
+                sh 'brew services restart tomcat'
             }
         }
     }
@@ -61,7 +85,7 @@ pipeline {
             sh """
             aws sns publish \
             --topic-arn ${SNS_TOPIC_ARN} \
-            --message "Deployment SUCCESS: Node site & artifacts uploaded. Check S3."
+            --message "Deployment SUCCESS: Node site & artifacts uploaded. Maven & Gradle deployed on Tomcat."
             """
         }
         failure {
